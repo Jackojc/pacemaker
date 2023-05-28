@@ -1,0 +1,38 @@
+# beatgen version (ISO 8601)
+VERSION=2023-05-28
+
+PREFIX=/usr/local
+MANPREFIX=$(PREFIX)/share/man
+
+INC=-Isrc/ -Ideps/conflict/include
+LIB=-ljack
+
+CXX=g++
+
+PROJ_CXXSTD=c++17
+PROJ_CXXWARN=-Werror -Wall -Wextra -Wno-unused -pedantic -Wno-unused-parameter
+
+PROJ_DBG_CPPFLAGS=-DPROJ_VERSION=\"$(VERSION)\"
+PROJ_DBG_CXXFLAGS=-std=$(PROJ_CXXSTD) $(PROJ_CXXWARN) $(PROJ_CPPFLAGS) \
+	-Og -g -fno-omit-frame-pointer $(CXXFLAGS) $(INC)
+PROJ_DBG_LDFLAGS=$(LIB) $(LDFLAGS)
+
+PROJ_REL_CPPFLAGS=-DPROJ_VERSION=\"$(VERSION)\" -DNDEBUG
+PROJ_REL_CXXFLAGS=-std=$(PROJ_CXXSTD) $(PROJ_CXXWARN) $(PROJ_CPPFLAGS) \
+	-march=native -O3 $(CXXFLAGS) $(INC)
+PROJ_REL_LDFLAGS=-flto -s $(LIB) $(LDFLAGS)
+
+DBG?=no
+
+ifeq ($(DBG),no)
+	PROJ_CPPFLAGS=$(PROJ_REL_CPPFLAGS)
+	PROJ_CXXFLAGS=$(PROJ_REL_CXXFLAGS)
+	PROJ_LDFLAGS=$(PROJ_REL_LDFLAGS)
+else ifeq ($(DBG),yes)
+	PROJ_CPPFLAGS=$(PROJ_DBG_CPPFLAGS)
+	PROJ_CXXFLAGS=$(PROJ_DBG_CXXFLAGS)
+	PROJ_LDFLAGS=$(PROJ_DBG_LDFLAGS)
+else
+$(error DBG should be either yes or no)
+endif
+
