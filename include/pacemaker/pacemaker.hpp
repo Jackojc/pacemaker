@@ -4,9 +4,9 @@
 #include <memory>
 
 extern "C" {
-	#include <jack/jack.h>
-	#include <jack/midiport.h>
-	#include <jack/ringbuffer.h>
+#include <jack/jack.h>
+#include <jack/midiport.h>
+#include <jack/ringbuffer.h>
 }
 
 namespace bg {
@@ -33,18 +33,20 @@ namespace bg {
 		// cane::Timeline events;
 
 		~JackData() {
-			if (client != nullptr)
+			if (client != nullptr) {
 				jack_deactivate(client);
+			}
 
-			if (port != nullptr)
+			if (port != nullptr) {
 				jack_port_unregister(client, port);
+			}
 
-			if (client != nullptr)
+			if (client != nullptr) {
 				jack_client_close(client);
+			}
 		}
 	};
 
-}
+}  // namespace bg
 
 #endif
-
