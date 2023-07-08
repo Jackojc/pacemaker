@@ -1,0 +1,6 @@
+[submodule "deps/conflict"]
+	path = deps/conflict
+	url = https://github.com/qookei/conflict
+[submodule "deps/lexy"]
+	path = deps/lexy
+	url = https://github.com/foonathan/lexy
