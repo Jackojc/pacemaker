@@ -44,7 +44,6 @@ Cpp11BracedListStyle: false
 EmptyLineAfterAccessModifier: Always
 EmptyLineBeforeAccessModifier: LogicalBlock
 FixNamespaceComments: true
-IncludeBlocks: Regroup
 IndentAccessModifiers: false
 IndentCaseBlocks: false
 IndentCaseLabels: true
