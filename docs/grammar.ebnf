@@ -1,0 +1,15 @@
+expr ::= <literal> | <command>
+command ::= <identifier> <expr>
+
+literal ::= <int> | <string> | <tuple> | <time>
+
+int ::= ? 0-9+ ?
+string ::= ? ".*" ?
+tuple ::= '[' <literal>* ']'
+time ::= <int> ( "ms" | "s" | "us" | "m" | "hr" )
+identifier ::= ? {XID_Start}{XID_Continue}* ?
+comment ::= ? #.*\n ?
+
+line ::= <command> ( ',' <command> )*
+
+
