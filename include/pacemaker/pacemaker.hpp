@@ -1,5 +1,5 @@
-#ifndef BEATGEN_LIP_HPP
-#define BEATGEN_LIP_HPP
+#ifndef PACEMAKER_HPP
+#define PACEMAKER_HPP
 
 #include <memory>
 
@@ -9,44 +9,87 @@ extern "C" {
 #include <jack/ringbuffer.h>
 }
 
-namespace bg {
+#include <pacemaker/util.hpp>
 
-	struct jack_deleter {
-		template <typename T> constexpr void operator()(T arg) const {
-			jack_free(arg);
-		}
-	};
+namespace pacemaker {
+	int sample_rate_callback(jack_nframes_t new_sample_rate, void* arg);
+	int buffer_size_callback(jack_nframes_t new_buffer_size, void* arg);
 
-	using JackPorts = std::unique_ptr<const char*[], jack_deleter>;
+	namespace detail {
+		struct JackClientDeleter {
+			constexpr void operator()(jack_client_t* client) const noexcept {
+				jack_free(client);
+			}
+		};
 
-	struct JackData {
+		struct JackPortDeleter {
+			jack_client_t* client = nullptr;
+
+			template <typename T>
+			constexpr void operator()(jack_port_t* port) const noexcept {
+				jack_port_unregister(client, port);
+			}
+		};
+
+		using JackClient =
+			std::unique_ptr<jack_client_t, detail::JackClientDeleter>;
+
+		using JackPort = std::unique_ptr<jack_port_t, detail::JackPortDeleter>;
+	}  // namespace detail
+
+	struct JackConnection {
 		jack_client_t* client = nullptr;
-		jack_port_t* port = nullptr;
 
 		jack_nframes_t sample_rate = 0;
 		jack_nframes_t buffer_size = 0;
-		uint64_t time = 0u;
 
-		// cane::Timeline::iterator it;
-		// cane::Timeline::const_iterator end;
-
-		// cane::Timeline events;
-
-		~JackData() {
-			if (client != nullptr) {
-				jack_deactivate(client);
+		JackConnection() {
+			if (not(client = PACEMAKER_DBG(jack_client_open(
+						"pacemaker",
+						JackOptions::JackNoStartServer,
+						nullptr)))) {
+				throw Fatal {};
 			}
 
-			if (port != nullptr) {
-				jack_port_unregister(client, port);
+			if (PACEMAKER_DBG(jack_set_sample_rate_callback(
+					client, sample_rate_callback, static_cast<void*>(this)))) {
+				throw Fatal {};
+			}
+
+			if (PACEMAKER_DBG(jack_set_buffer_size_callback(
+					client, buffer_size_callback, static_cast<void*>(this)))) {
+				throw Fatal {};
+			}
+
+			buffer_size = PACEMAKER_DBG(jack_get_buffer_size(client));
+			sample_rate = PACEMAKER_DBG(jack_get_sample_rate(client));
+		}
+
+		~JackConnection() {
+			if (client != nullptr) {
+				PACEMAKER_DBG(jack_deactivate(client));
 			}
 
 			if (client != nullptr) {
-				jack_client_close(client);
+				PACEMAKER_DBG(jack_client_close(client));
 			}
 		}
+
+		JackConnection(const JackConnection& conn) {}
 	};
 
-}  // namespace bg
+	int sample_rate_callback(jack_nframes_t new_sample_rate, void* arg) {
+		auto& client = *static_cast<JackConnection*>(arg);
+		client.sample_rate = new_sample_rate;
+		return 0;
+	}
+
+	int buffer_size_callback(jack_nframes_t new_buffer_size, void* arg) {
+		auto& client = *static_cast<JackConnection*>(arg);
+		client.buffer_size = new_buffer_size;
+		return 0;
+	}
+
+}  // namespace pacemaker
 
 #endif

@@ -14,3 +14,8 @@ target_compile_options(pacemaker PUBLIC ${JACK_CFLAGS_OTHER})
 target_include_directories(pacemaker PUBLIC deps/conflict/include)
 target_include_directories(pacemaker PUBLIC deps/lexy/include)
 target_include_directories(pacemaker PUBLIC include)
+
+target_compile_options(pacemaker PRIVATE
+	$<$<CXX_COMPILER_ID:MSVC>:/W4>
+	$<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>
+)
