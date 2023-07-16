@@ -36,9 +36,9 @@ BreakBeforeTernaryOperators: false
 BreakConstructorInitializers: AfterColon
 BreakInheritanceList: AfterColon
 BreakStringLiterals: true
-ColumnLimit: 80
+ColumnLimit: 120
 CompactNamespaces: false
-ConstructorInitializerIndentWidth: 8
+ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
 Cpp11BracedListStyle: false
 EmptyLineAfterAccessModifier: Always
@@ -92,5 +92,5 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 Standard: Latest
 TabWidth: 4
-UseTab: ForContinuationAndIndentation
+UseTab: Always
 
