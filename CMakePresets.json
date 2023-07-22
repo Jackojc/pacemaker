@@ -27,7 +27,7 @@
 			"inherits": "linux-clang",
 
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "RelWithDebugInfo"
+				"CMAKE_BUILD_TYPE": "Debug"
 			}
 		},
 

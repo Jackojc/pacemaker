@@ -145,6 +145,28 @@ namespace pacemaker {
 		return print(os, detail::log_to_str(x));
 	}
 
+	// Errors/Warnings
+	template <typename... Ts> inline void info(Ts&&... args) {
+		println(std::cerr, detail::log_to_str(LogLevel::INF), " ", std::forward<Ts>(args)..., PACEMAKER_RESET);
+	}
+
+	template <typename... Ts> inline void warning(Ts&&... args) {
+		println(std::cerr, detail::log_to_str(LogLevel::WRN), " ", std::forward<Ts>(args)..., PACEMAKER_RESET);
+	}
+
+	template <typename... Ts> [[noreturn]] inline void fatal_error(Ts&&... args) {
+		println(std::cerr, detail::log_to_str(LogLevel::ERR), " ", std::forward<Ts>(args)..., PACEMAKER_RESET);
+		throw Fatal {};
+	}
+
+	template <typename... Ts> inline void error(Ts&&... args) {
+		println(std::cerr, detail::log_to_str(LogLevel::ERR), " ", std::forward<Ts>(args)..., PACEMAKER_RESET);
+	}
+
+	template <typename... Ts> inline void ok(Ts&&... args) {
+		println(std::cerr, detail::log_to_str(LogLevel::OK), " ", std::forward<Ts>(args)..., PACEMAKER_RESET);
+	}
+
 #define PACEMAKER_LOG(...)                                                                                         \
 	do {                                                                                                           \
 		[PACEMAKER_VAR(fn_name) = __func__](pacemaker::LogLevel PACEMAKER_VAR(x), auto&&... PACEMAKER_VAR(args)) { \
@@ -165,6 +187,13 @@ namespace pacemaker {
                                                                                                                    \
 			PACEMAKER_DBG_RUN((pacemaker::print(std::cerr, '\n', PACEMAKER_RESET)));                               \
 		}(__VA_ARGS__);                                                                                            \
+	} while (0)
+
+#define PACEMAKER_ASSERT(cond)                                          \
+	do {                                                                \
+		if (not(cond)) {                                                \
+			pacemaker::fatal_error("assertion failed: `", #cond, "`!"); \
+		}                                                               \
 	} while (0)
 }  // namespace pacemaker
 
@@ -192,30 +221,6 @@ namespace pacemaker {
 
 	template <typename T, typename... Ts> [[nodiscard]] constexpr bool cmp_none(T&& first, Ts&&... rest) {
 		return ((std::forward<T>(first) != std::forward<Ts>(rest)) and ...);
-	}
-}  // namespace pacemaker
-
-// Errors/Warnings
-namespace pacemaker {
-	template <typename... Ts> inline void info(Ts&&... args) {
-		println(std::cerr, detail::log_to_str(LogLevel::INF), " ", std::forward<Ts>(args)..., PACEMAKER_RESET);
-	}
-
-	template <typename... Ts> inline void warning(Ts&&... args) {
-		println(std::cerr, detail::log_to_str(LogLevel::WRN), " ", std::forward<Ts>(args)..., PACEMAKER_RESET);
-	}
-
-	template <typename... Ts> [[noreturn]] inline void fatal_error(Ts&&... args) {
-		println(std::cerr, detail::log_to_str(LogLevel::ERR), " ", std::forward<Ts>(args)..., PACEMAKER_RESET);
-		throw Fatal {};
-	}
-
-	template <typename... Ts> inline void error(Ts&&... args) {
-		println(std::cerr, detail::log_to_str(LogLevel::ERR), " ", std::forward<Ts>(args)..., PACEMAKER_RESET);
-	}
-
-	template <typename... Ts> inline void ok(Ts&&... args) {
-		println(std::cerr, detail::log_to_str(LogLevel::OK), " ", std::forward<Ts>(args)..., PACEMAKER_RESET);
 	}
 }  // namespace pacemaker
 

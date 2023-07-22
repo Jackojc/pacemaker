@@ -17,19 +17,37 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] const char* argv[]) {
 	try {
 		pacemaker::JackClient client;
 
-		auto port = client.port_register_output("port1");
-		port.connect("Midi-Bridge:NTS-1");
+		auto port = client.port_register_output("foo");
+		// auto port2 = client.port_register_output("foo2");
 
-		client.set_callback([&](jack_nframes_t frames, pacemaker::JackClient&) {
-			PACEMAKER_LOG(pacemaker::LogLevel::OK, frames);
+		client.set_callback([&](jack_nframes_t) {
+			// PACEMAKER_LOG(pacemaker::LogLevel::OK, frames);
+			// TODO: Calculate time passed.
 			return 0;
 		});
 
-		client.ready();
+		PACEMAKER_ASSERT(client.ready());
+		// PACEMAKER_ASSERT(port.connect("Midi-Bridge:Midi Through:(playback_0) Midi Through Port-0"));
 
-		while (true) {
-			std::this_thread::sleep_for(std::chrono::seconds { 1 });
-		}
+		// size_t i = 0;
+		// std::vector<pacemaker::JackPort> ports;
+
+		// auto ports = client.get_my_ports();
+		// for (auto& p: ports) {
+		// 	pacemaker::println(std::cerr, "Mine: ", p);
+		// }
+
+		// while (true) {
+		// 	// pacemaker::println(std::cerr, port_a.get_connections().size());
+		// 	// ports.emplace_back(client.port_register_output(std::to_string(i++)));
+		// 	auto ports = port.get_connections();
+		// 	for (auto& p: ports) {
+		// 		pacemaker::println(std::cerr, p);
+		// 	}
+		// 	std::this_thread::sleep_for(std::chrono::seconds { 1 });
+		// }
+
+		// std::this_thread::sleep_for(std::chrono::seconds { 1 });
 
 		// JackPorts ports { jack_get_ports(
 		// 	data.client, "", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput) };

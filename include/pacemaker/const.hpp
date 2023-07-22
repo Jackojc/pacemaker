@@ -3,6 +3,20 @@
 
 namespace pacemaker {
 	constexpr auto STR_CLIENT_NAME = "pacemaker";
-}
+
+	constexpr auto STR_WARNING_STARTED = "JACK server was started";
+
+	constexpr auto STR_ERROR_GENERAL = "general error occured";
+	constexpr auto STR_ERROR_INVALID_OPTION = "invalid or unsupported option";
+	constexpr auto STR_ERROR_NAME_EXISTS = "client name is not unique";
+	constexpr auto STR_ERROR_CONNECT = "cannot connect to the JACK server";
+	constexpr auto STR_ERROR_COMMUNICATION = "communication error with JACK server";
+	constexpr auto STR_ERROR_NO_CLIENT = "requested client does not exist";
+	constexpr auto STR_ERROR_LOAD_INTERNAL_CLIENT = "could not load internal client";
+	constexpr auto STR_ERROR_INITIALISATION = "initialisation failed";
+	constexpr auto STR_ERROR_PROTOCOL = "protocol version mismatch";
+	constexpr auto STR_ERROR_INTERNAL = "internal error occured";
+	constexpr auto STR_ERROR_ZOMBIE = "zombie client";
+}  // namespace pacemaker
 
 #endif
