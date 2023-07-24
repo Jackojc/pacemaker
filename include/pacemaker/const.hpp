@@ -6,6 +6,7 @@ namespace pacemaker {
 
 	constexpr auto STR_WARNING_STARTED = "JACK server was started";
 
+	constexpr auto STR_ERROR_CLIENT = "could not open client";
 	constexpr auto STR_ERROR_GENERAL = "general error occured";
 	constexpr auto STR_ERROR_INVALID_OPTION = "invalid or unsupported option";
 	constexpr auto STR_ERROR_NAME_EXISTS = "client name is not unique";

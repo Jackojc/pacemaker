@@ -96,8 +96,7 @@ namespace pacemaker {
 		}
 
 		JackPort(JackPort&& other) noexcept:
-			client(std::exchange(other.client, nullptr)),
-			port(std::exchange(other.port, nullptr)) {}
+				client(std::exchange(other.client, nullptr)), port(std::exchange(other.port, nullptr)) {}
 
 		JackPort& operator=(JackPort&& other) noexcept {
 			std::swap(client, other.client);
@@ -134,14 +133,34 @@ namespace pacemaker {
 	};
 
 	namespace detail {
-		template <typename F> inline bool check(jack_status_t status, jack_status_t flag, F&& fn) {
-			bool is_present = (status & flag) == flag;
+		template <typename... Ts>
+		inline bool check_fatal(jack_status_t status, Ts&&... args) {
+			return ([&](auto&& p) {
+				auto&& [flag, str] = p;
+				bool is_present = (status & flag) == flag;
 
-			if (is_present) {
-				fn();
-			}
+				if (is_present) {
+					pacemaker::fatal_error(str);
+				}
 
-			return is_present;
+				return is_present;
+			}(std::forward<Ts>(args)) and
+				...);
+		}
+
+		template <typename... Ts>
+		inline bool check_warning(jack_status_t status, Ts&&... args) {
+			return ([&](auto&& p) {
+				auto&& [flag, str] = p;
+				bool is_present = (status & flag) == flag;
+
+				if (is_present) {
+					pacemaker::warning(str);
+				}
+
+				return is_present;
+			}(std::forward<Ts>(args)) and
+				...);
 		}
 	}  // namespace detail
 
@@ -170,21 +189,24 @@ namespace pacemaker {
 			PACEMAKER_DBG(flags);
 
 			if (not client) {
-				pacemaker::fatal_error("could not open client");
+				pacemaker::fatal_error(STR_ERROR_CLIENT);
 			}
 
-			detail::check(flags, JackFailure, [&] { pacemaker::fatal_error(STR_ERROR_GENERAL); });
-			detail::check(flags, JackInvalidOption, [&] { pacemaker::fatal_error(STR_ERROR_INVALID_OPTION); });
-			detail::check(flags, JackNameNotUnique, [&] { pacemaker::fatal_error(STR_ERROR_NAME_EXISTS); });
-			detail::check(flags, JackServerStarted, [&] { pacemaker::warning(STR_WARNING_STARTED); });
-			detail::check(flags, JackServerFailed, [&] { pacemaker::fatal_error(STR_ERROR_CONNECT); });
-			detail::check(flags, JackServerError, [&] { pacemaker::fatal_error(STR_ERROR_COMMUNICATION); });
-			detail::check(flags, JackNoSuchClient, [&] { pacemaker::fatal_error(STR_ERROR_NO_CLIENT); });
-			detail::check(flags, JackLoadFailure, [&] { pacemaker::fatal_error(STR_ERROR_LOAD_INTERNAL_CLIENT); });
-			detail::check(flags, JackShmFailure, [&] { pacemaker::fatal_error(STR_ERROR_INITIALISATION); });
-			detail::check(flags, JackVersionError, [&] { pacemaker::fatal_error(STR_ERROR_PROTOCOL); });
-			detail::check(flags, JackBackendError, [&] { pacemaker::fatal_error(STR_ERROR_INTERNAL); });
-			detail::check(flags, JackClientZombie, [&] { pacemaker::fatal_error(STR_ERROR_ZOMBIE); });
+			detail::check_fatal(flags,
+				std::pair { JackFailure, STR_ERROR_GENERAL },
+				std::pair { JackInvalidOption, STR_ERROR_INVALID_OPTION },
+				std::pair { JackNameNotUnique, STR_ERROR_NAME_EXISTS },
+				std::pair { JackServerStarted, STR_WARNING_STARTED },
+				std::pair { JackServerFailed, STR_ERROR_CONNECT },
+				std::pair { JackServerError, STR_ERROR_COMMUNICATION },
+				std::pair { JackNoSuchClient, STR_ERROR_NO_CLIENT },
+				std::pair { JackLoadFailure, STR_ERROR_LOAD_INTERNAL_CLIENT },
+				std::pair { JackShmFailure, STR_ERROR_INITIALISATION },
+				std::pair { JackVersionError, STR_ERROR_PROTOCOL },
+				std::pair { JackBackendError, STR_ERROR_INTERNAL },
+				std::pair { JackClientZombie, STR_ERROR_ZOMBIE });
+
+			detail::check_warning(flags, std::pair { JackServerStarted, STR_WARNING_STARTED });
 
 			// Notify on changes to sample rate.
 			// We need this information to be correct so we can properly keep
@@ -237,9 +259,7 @@ namespace pacemaker {
 		}
 
 		JackClient(jack_client_t* client_, jack_nframes_t sample_rate_, jack_nframes_t buffer_size_):
-			client(client_),
-			sample_rate(sample_rate_),
-			buffer_size(buffer_size_) {}
+				client(client_), sample_rate(sample_rate_), buffer_size(buffer_size_) {}
 
 		~JackClient() {
 			PACEMAKER_DBG(jack_deactivate(client));
@@ -247,9 +267,9 @@ namespace pacemaker {
 		}
 
 		JackClient(JackClient&& other) noexcept:
-			client(std::exchange(other.client, nullptr)),
-			sample_rate(std::exchange(other.sample_rate, 0)),
-			buffer_size(std::exchange(other.buffer_size, 0)) {}
+				client(std::exchange(other.client, nullptr)),
+				sample_rate(std::exchange(other.sample_rate, 0)),
+				buffer_size(std::exchange(other.buffer_size, 0)) {}
 
 		JackClient& operator=(const JackClient& other) = delete;
 
@@ -274,7 +294,8 @@ namespace pacemaker {
 			return jack_port_is_mine(client, port);
 		}
 
-		template <typename F> bool set_callback(F&& fn) {
+		template <typename F>
+		bool set_callback(F&& fn) {
 			callback = fn;
 
 			const auto wrapper = [](jack_nframes_t nframes, void* arg) {
