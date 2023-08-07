@@ -1,8 +1,17 @@
+#include "pacemaker/const.hpp"
+#include "pacemaker/sequencer.hpp"
+#include "pacemaker/util.hpp"
+#include <bits/chrono.h>
+#include <exception>
+#include <jack/jack.h>
+#include <jack/types.h>
+#include <utility>
 #include <chrono>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <atomic>
 #include <thread>
 #include <vector>
 #include <compare>
@@ -18,201 +27,104 @@
 
 #include <pacemaker/pacemaker.hpp>
 
-namespace pacemaker {
-	using Unit = std::chrono::milliseconds;
-
-	using MidiPrimitive = uint8_t;
-	using MidiStatus = MidiPrimitive;
-	using MidiFunction = MidiPrimitive;
-	using MidiChannel = MidiPrimitive;
-	using MidiNote = MidiPrimitive;
-	using MidiVelocity = MidiPrimitive;
-	using MidiData = MidiPrimitive;
-
-	using Notes = std::vector<MidiNote>;
-
-	struct Channel {
-		MidiChannel channel;
-		pacemaker::Unit frequency;
-		pacemaker::Notes notes;
-
-		Channel() = default;
-
-		Channel(MidiChannel channel_, pacemaker::Unit frequency_, pacemaker::Notes notes_):
-				channel(channel_), frequency(frequency_), notes(notes_) {}
-	};
-
-	using Patch = std::vector<pacemaker::Channel>;
-
-	using Midi = std::array<MidiPrimitive, 3>;
-
-	struct Event {
-		pacemaker::Unit timestamp;
-		pacemaker::Midi data;
-
-		Event() = default;
-
-		Event(pacemaker::Unit timestamp_, pacemaker::Midi data_): timestamp(timestamp_), data(data_) {}
-
-		auto operator<=>(const Event&) const = default;
-	};
-
-	using Timeline = std::vector<pacemaker::Event>;
-
-	namespace detail {
-		pacemaker::Unit event_at(pacemaker::Unit timestamp, pacemaker::Unit frequency) {
-			return std::chrono::duration_cast<pacemaker::Unit>(frequency *
-				std::ceil(std::chrono::duration<double>(timestamp).count() /
-					std::chrono::duration<double>(frequency).count()));
-		}
-
-		size_t events_between(pacemaker::Unit begin, pacemaker::Unit end, pacemaker::Unit frequency) {
-			return (end - begin) / frequency;
-		}
-	}  // namespace detail
-
-	pacemaker::Timeline timeline(pacemaker::Unit begin, pacemaker::Unit end, const pacemaker::Patch& p) {
-		using namespace std::literals;
-
-		pacemaker::Timeline tl;
-
-		for (auto it = p.begin(); it != p.end(); ++it) {
-			auto& [channel, frequency, notes] = *it;
-
-			// Find the extent of the events we need for this slice of time.
-			auto first_event = PACEMAKER_DBG(detail::event_at(begin, frequency));
-			auto last_event = PACEMAKER_DBG(detail::event_at(end, frequency));
-
-			// Generate all of the in-between events (exclusive).
-			size_t event_count = PACEMAKER_DBG(detail::events_between(first_event, last_event, frequency));
-			size_t offset = PACEMAKER_DBG(detail::events_between(0ms, first_event, frequency));
-
-			for (size_t i = 0; i != event_count; ++i) {
-				pacemaker::Unit timestamp = PACEMAKER_DBG(frequency * i + (first_event));
-
-				if (timestamp >= end or timestamp < begin) {
-					PACEMAKER_LOG(LogLevel::ERR, timestamp, " >= ", end, " or ", timestamp, " < ", begin);
-				}
-
-				pacemaker::MidiStatus status = static_cast<MidiStatus>(0b1000'0000 | channel);
-				pacemaker::MidiNote note = notes.at((i + offset) % notes.size());
-				pacemaker::MidiVelocity velocity = 127;
-
-				tl.emplace_back(timestamp, pacemaker::Midi { status, note, velocity });
-			}
-		}
-
-		std::sort(tl.begin(), tl.end());
-
-		return tl;
-	}
-}  // namespace pacemaker
-
-// std::ostream overloads
-namespace pacemaker {
-	namespace detail {
-		template <typename T>
-		inline std::ostream& serialise_container(std::ostream& os, const T& c) {
-			if (c.empty()) {
-				return (os << "[]");
-			}
-
-			auto it = c.begin();
-			os << '[' << *it;
-
-			for (; it != c.end(); ++it) {
-				os << ", " << *it;
-			}
-
-			return (os << ']');
-		}
-	}  // namespace detail
-
-	inline std::ostream& operator<<(std::ostream& os, const Notes& ns) {
-		return detail::serialise_container(os, ns);
-	}
-
-	inline std::ostream& operator<<(std::ostream& os, const Channel& ch) {
-		return (os << "{channel: " << ch.channel << ", frequency: " << ch.frequency << ", notes: " << ch.notes << "}");
-	}
-
-	inline std::ostream& operator<<(std::ostream& os, const Patch& p) {
-		return detail::serialise_container(os, p);
-	}
-
-	inline std::ostream& operator<<(std::ostream& os, const Midi& m) {
-		return (os << "{status: " << (int)m.at(0) << ", data1: " << (int)m.at(1) << ", data2: " << (int)m.at(2) << "}");
-	}
-
-	inline std::ostream& operator<<(std::ostream& os, const Event& ev) {
-		return (os << "{timestamp: " << ev.timestamp << ", data: " << ev.data << "}");
-	}
-
-	inline std::ostream& operator<<(std::ostream& os, const Timeline& tl) {
-		return detail::serialise_container(os, tl);
-	}
-}  // namespace pacemaker
-
 int main([[maybe_unused]] int argc, [[maybe_unused]] const char* argv[]) {
 	try {
 		using namespace std::literals;
 
-		auto patch = pacemaker::Patch {
-			pacemaker::Channel { 1, 100ms, pacemaker::Notes { 54, 64, 74 } },
-			pacemaker::Channel { 2, 175ms, pacemaker::Notes { 60 } },
-			pacemaker::Channel { 3, 200ms, pacemaker::Notes { 50, 57 } },
-		};
+		PACEMAKER_LOG(pacemaker::LogLevel::OK, "starting");
 
-		auto tl = pacemaker::timeline(150ms, 1000ms, patch);
-		pacemaker::println(std::cerr, tl);
+		pacemaker::JackClient client;
+		auto& port = client.port_register_output(pacemaker::STR_CLIENT_NAME);
 
-		for (pacemaker::Event ev: tl) {
-			pacemaker::println(std::cerr, ev);
+		PACEMAKER_LOG(pacemaker::LogLevel::OK, "collecting ports");
+
+		PACEMAKER_ASSERT(argc > 1);
+		auto ports = client.get_input_ports(argv[1]);
+
+		pacemaker::println(std::cerr, "matches:");
+		for (auto& p: ports) {
+			pacemaker::println(std::cerr, p);
 		}
 
-		// pacemaker::println(
-		// 	std::cerr,
-		// 	std::chrono::duration_cast<std::chrono::milliseconds>(pacemaker::detail::nearest_event(400ms, 200ms)));
+		PACEMAKER_ASSERT(port.connect(ports.front()));
+		PACEMAKER_ASSERT(client.ready());
 
-		// pacemaker::JackClient client;
+		PACEMAKER_LOG(pacemaker::LogLevel::OK, "ready");
 
-		// auto port = client.port_register_output("foo");
-		// auto port2 = client.port_register_output("foo2");
+		std::this_thread::sleep_for(1s);
 
-		// client.set_callback([&](jack_nframes_t) {
-		// PACEMAKER_LOG(pacemaker::LogLevel::OK, frames);
-		// TODO: Calculate time passed.
-		// return 0;
+		// pacemaker::Unit buffer_size = 5s;
+		// auto default_patch = pacemaker::Patch {
+		// 	pacemaker::Channel { { 0, pacemaker::MIDI_NOTE_ON }, 2s, 0s, pacemaker::Notes { 64 } },
+		// 	pacemaker::Channel { { 0, pacemaker::MIDI_NOTE_OFF }, 2s, 1s, pacemaker::Notes { 64 } },
+		// };
+
+		// pacemaker::Timeline timeline_reader;
+		// pacemaker::Timeline::iterator it;
+
+		// std::atomic_bool writer_ready = false;
+		// std::atomic_bool reader_ready = false;
+
+		// client.set_callback([&](jack_nframes_t frames) {
+		// 	using namespace std::literals;
+		// 	using namespace pacemaker;
+
+		// 	void* buffer = port.get_buffer(frames);
+		// 	jack_midi_clear_buffer(buffer);
+
+		// 	if (writer_ready) {
+		// 		return 0;
+		// 	}
+
+		// 	jack_nframes_t current_frames;
+		// 	jack_time_t current_usecs;
+		// 	jack_time_t next_usecs;
+		// 	float period_usecs;
+
+		// 	jack_get_cycle_times(client, &current_frames, &current_usecs, &next_usecs, &period_usecs);
+
+		// 	Unit current = std::chrono::duration_cast<Unit>(std::chrono::microseconds { current_usecs });
+
+		// 	for (; it != timeline_reader.end() and it->timestamp <= current; ++it) {
+		// 		jack_midi_event_write(buffer, 0, it->midi.data(), it->midi.size());
+		// 	}
+
+		// 	if (it == timeline_reader.end()) {
+		// 		reader_ready = true;
+		// 	}
+
+		// 	return 0;
 		// });
 
 		// PACEMAKER_ASSERT(client.ready());
-		// PACEMAKER_ASSERT(port.connect("Midi-Bridge:Midi Through:(playback_0) Midi Through Port-0"));
+		// PACEMAKER_ASSERT(port.connect("lmms:MIDI in"));
 
-		// size_t i = 0;
-		// std::vector<pacemaker::JackPort> ports;
-
-		// auto ports = client.get_my_ports();
-		// for (auto& p: ports) {
-		// 	pacemaker::println(std::cerr, "Mine: ", p);
-		// }
+		// PACEMAKER_LOG(pacemaker::LogLevel::OK, "ready");
 
 		// while (true) {
-		// 	// pacemaker::println(std::cerr, port_a.get_connections().size());
-		// 	// ports.emplace_back(client.port_register_output(std::to_string(i++)));
-		// 	auto ports = port.get_connections();
-		// 	for (auto& p: ports) {
-		// 		pacemaker::println(std::cerr, p);
-		// 	}
-		// 	std::this_thread::sleep_for(std::chrono::seconds { 1 });
+		// 	jack_nframes_t current_frames = jack_frame_time(client);
+		// 	jack_time_t current_time = jack_frames_to_time(client, current_frames);
+
+		// 	auto current = std::chrono::duration_cast<pacemaker::Unit>(std::chrono::microseconds { current_time });
+
+		// 	auto begin = pacemaker::detail::event_at(current + buffer_size, buffer_size);
+		// 	auto end = begin + buffer_size;
+
+		// 	auto timeline_writer = pacemaker::timeline(begin, end, default_patch);
+
+		// 	PACEMAKER_LOG(pacemaker::LogLevel::OK, "buffer generated! ", begin, " -> ", end);
+		// 	writer_ready = true;
+
+		// 	while (not reader_ready) {}
+
+		// 	std::swap(timeline_reader, timeline_writer);
+		// 	it = timeline_reader.begin();
+
+		// 	writer_ready = false;
+		// 	reader_ready = false;
 		// }
 
-		// std::this_thread::sleep_for(std::chrono::seconds { 1 });
-
-		// JackPorts ports { jack_get_ports(
-		// 	data.client, "", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput) };
-
-		// if (jack_connect(data.client, jack_port_name(data.port), ports[0]))
-		// {}
+		PACEMAKER_LOG(pacemaker::LogLevel::OK, "done!");
 	}
 
 	catch (pacemaker::Fatal) {

@@ -1,6 +1,12 @@
 #ifndef PACEMAKER_CONST_HPP
 #define PACEMAKER_CONST_HPP
 
+// Misc. Constants
+namespace pacemaker {
+	constexpr auto RINGBUFFER_SIZE = 16'384;
+}
+
+// Strings
 namespace pacemaker {
 	constexpr auto STR_CLIENT_NAME = "pacemaker";
 
@@ -19,5 +25,11 @@ namespace pacemaker {
 	constexpr auto STR_ERROR_INTERNAL = "internal error occured";
 	constexpr auto STR_ERROR_ZOMBIE = "zombie client";
 }  // namespace pacemaker
+
+// MIDI Constants
+namespace pacemaker {
+	constexpr auto MIDI_NOTE_OFF = 0b1000'0000;
+	constexpr auto MIDI_NOTE_ON = 0b1001'0000;
+}
 
 #endif
