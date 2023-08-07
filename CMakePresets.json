@@ -58,6 +58,14 @@
 			}
 		},
 		{
+			"name": "linux-clang-san",
+			"inherits": "linux-clang",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"CMAKE_CXX_FLAGS": "-fsanitize=thread,undefined"
+			}
+		},
+		{
 			"name": "linux-clang-release",
 			"inherits": "linux-clang",
 			"cacheVariables": {
@@ -69,6 +77,10 @@
 		{
 			"name": "clang-debug",
 			"configurePreset": "linux-clang-debug"
+		},
+		{
+			"name": "clang-sanitize",
+			"configurePreset": "linux-clang-san"
 		},
 		{
 			"name": "clang-release",
